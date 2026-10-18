@@ -1,0 +1,29 @@
+services:
+  falkordb:
+    image: falkordb/falkordb:latest
+    ports:
+      - "6379:6379"
+      - "3000:3000"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  api:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      FALKORDB_HOST: falkordb
+      FALKORDB_PORT: "6379"
+    depends_on:
+      falkordb:
+        condition: service_healthy
+  web:
+    build: ./frontend
+    ports:
+      - "3001:3001"
+    environment:
+      NEXT_PUBLIC_API_BASE: http://localhost:8000
+    depends_on:
+      - api
