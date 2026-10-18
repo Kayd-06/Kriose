@@ -1,0 +1,13 @@
+{
+  "channel": "payments-arch",
+  "messages": [
+    {
+      "user": "elena",
+      "text": "RFC-409 stands: Token-Vault-Cache stays behind ZeroTrust-JWT-Guard."
+    },
+    {
+      "user": "liam",
+      "text": "Proposal: temporarily expose Token-Vault-Cache on a public route. This contradicts RFC-409."
+    }
+  ]
+}
