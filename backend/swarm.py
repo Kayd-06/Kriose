@@ -20,11 +20,19 @@ class Swarm:
         engine = self.engine
         graph = graph_name(tenant_id)
         session = uuid.uuid4().hex[:8]
+        started = time.perf_counter()
+
+        class _Stamped(list):
+            def append(self, item):
+                if isinstance(item, dict) and "t_ms" not in item:
+                    item["t_ms"] = int((time.perf_counter() - started) * 1000)
+                super().append(item)
+
         roles = engine.roles(graph)
         focus = roles["token"]
         meta = engine.meta(graph)
         now = int(meta.get("incident") or engine.times["now"])
-        events: list[dict] = []
+        events: list[dict] = _Stamped()
 
         ricci = engine.compute_ricci(graph)
         ghosts = engine.detect_ghosts(graph)
