@@ -4,9 +4,10 @@
 
 html,
 body {
-  background: #10120f;
-  color: #e7e4d8;
-  min-height: 100%;
+  background: #060709;
+  color: #e2e8f0;
+  height: 100%;
+  overflow: hidden;
 }
 
 body {
@@ -14,6 +15,25 @@ body {
 }
 
 button,
-input {
+input,
+select,
+textarea {
   font-family: inherit;
+}
+
+.font-mono,
+input,
+textarea,
+select {
+  font-variant-numeric: tabular-nums;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #1c202b transparent;
+}
+
+::selection {
+  background: #163044;
+  color: #e2e8f0;
 }

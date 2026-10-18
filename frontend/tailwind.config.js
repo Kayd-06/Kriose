@@ -11,7 +11,7 @@ module.exports = {
         clay: "#e07a4a",
       },
       fontFamily: {
-        mono: ["IBM Plex Mono", "ui-monospace", "monospace"],
+        mono: ["JetBrains Mono", "ui-monospace", "monospace"],
         sans: ["IBM Plex Sans", "Segoe UI", "sans-serif"],
       },
     },

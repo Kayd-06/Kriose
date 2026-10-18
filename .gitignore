@@ -8,3 +8,4 @@ venv/
 dist/
 *.log
 frontend/next-env.d.ts
+frontend/tsconfig.tsbuildinfo
