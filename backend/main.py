@@ -7,8 +7,9 @@ import json
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field
 
-from engine import KrioseEngine
+from engine import KrioseEngine, clock, graph_name
 from swarm import Swarm
 
 app = FastAPI(title="Kriose", version="2.0.0")
@@ -56,10 +57,69 @@ def seed(tenant: str = Query(default="")):
     return seeded
 
 
+def _jsonable(value):
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    if isinstance(value, bytes):
+        return value.decode(errors="replace")
+    if isinstance(value, dict):
+        return {str(key): _jsonable(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_jsonable(item) for item in value]
+    return str(value)
+
+
+class CypherBody(BaseModel):
+    graph: str = Field(min_length=1, max_length=128)
+    cypher: str = Field(min_length=1, max_length=20000)
+
+
+class GraphBody(BaseModel):
+    tenant: str = Field(min_length=1, max_length=64)
+
+
 @app.get("/api/v2/graph")
-def graph(tenant: str = "org_acme", at_time: int = 0):
+def graph(tenant: str = "", graph: str = "", at_time: int = 0, all_time: int = 0):
     require_db()
-    return engine.snapshot(tenant, at_time or None)
+    if graph:
+        tenant_id = graph.removeprefix("kriose_")
+    else:
+        tenant_id = tenant or "org_acme"
+    if not tenant_id.replace("_", "").replace("-", "").isalnum():
+        raise HTTPException(status_code=400, detail="tenant id must be alphanumeric")
+    return engine.snapshot(tenant_id, at_time or None, all_time=bool(all_time))
+
+
+@app.post("/api/v2/graphs")
+def create_graph(body: GraphBody):
+    require_db()
+    tenant_id = body.tenant.strip()
+    if not tenant_id.replace("_", "").replace("-", "").isalnum():
+        raise HTTPException(status_code=400, detail="tenant id must be alphanumeric")
+    times = clock()
+    name = graph_name(tenant_id)
+    engine.query(
+        name,
+        """
+        MERGE (m:Meta {id: 'clock'})
+        SET m.baseline = $baseline, m.incident = $incident
+        """,
+        {"baseline": times["baseline"], "incident": times["incident"]},
+    )
+    return {"graph": name, "tenant": tenant_id, "baseline": times["baseline"], "incident": times["incident"]}
+
+
+@app.post("/api/v2/cypher")
+def run_cypher(body: CypherBody):
+    require_db()
+    name = body.graph.strip()
+    if not name.replace("_", "").replace("-", "").isalnum():
+        raise HTTPException(status_code=400, detail="graph name must be alphanumeric")
+    try:
+        rows = engine.query(name, body.cypher)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"graph": name, "rows": _jsonable(rows), "count": len(rows)}
 
 
 @app.get("/api/v2/temporal-diff")
@@ -91,6 +151,25 @@ def simulate(tenant: str = "org_acme", alert_id: str = "alert_991"):
         yield f"data: {json.dumps({'agent': 'ARBITER', 'kind': 'done', 'detail': summary}, default=str)}\n\n"
 
     return StreamingResponse(generate(), media_type="text/event-stream")
+
+
+@app.post("/api/v2/swarm/stream")
+def swarm_stream(tenant: str = "org_acme", alert_id: str = "alert_991"):
+    return simulate(tenant, alert_id)
+
+
+@app.post("/api/v2/hivemind/publish")
+def hivemind_publish(
+    tenant: str,
+    focus_id: str,
+    action_type: str,
+    failure_mode: str = "operator publish",
+):
+    require_db()
+    if not focus_id or not action_type:
+        raise HTTPException(status_code=400, detail="focus_id and action_type are required")
+    published = engine.publish_failure_motif(tenant, focus_id, action_type, failure_mode)
+    return {"published": published, "hive": engine.hive_view()}
 
 
 @app.post("/api/v2/hivemind/sync")
