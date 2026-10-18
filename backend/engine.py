@@ -990,7 +990,7 @@ class KrioseEngine:
         )
         return episode_id
 
-    def snapshot(self, tenant_id: str, at_time: int | None = None) -> dict[str, Any]:
+    def snapshot(self, tenant_id: str, at_time: int | None = None, *, all_time: bool = False) -> dict[str, Any]:
         graph = graph_name(tenant_id)
         meta = self.meta(graph)
         when = int(at_time if at_time else meta.get("incident") or self.times["now"])
@@ -998,31 +998,54 @@ class KrioseEngine:
             graph,
             """
             MATCH (n)
-            WHERE n:Service OR n:Engineer OR n:Ingress OR n:AuthMiddleware
-               OR n:Alert OR n:DecisionDoc OR n:CodeSymbol OR n:RunbookAction
+            WHERE NOT n:Meta AND NOT n:TopologyMap
+              AND (n.id IS NOT NULL OR n.name IS NOT NULL)
             RETURN coalesce(n.id, n.name) AS id, labels(n)[0] AS kind, n.name AS name,
                    n.tier AS tier, n.current_load AS current_load, n.max_capacity AS max_capacity,
                    n.pii_classified AS pii_classified, n.min_ricci_kappa AS min_ricci_kappa,
                    n.oncall_available AS oncall_available, n.severity AS severity,
                    n.title AS title, n.action_type AS action_type, n.doc_type AS doc_type,
-                   n.function_name AS function_name
+                   n.function_name AS function_name, n.execution_cost AS execution_cost,
+                   n.exposure AS exposure
             """,
         )
-        links = self.query(
-            graph,
-            """
-            MATCH (a)-[r]->(b)
-            WHERE coalesce(r.t_valid_from, 0) <= $when
-              AND coalesce(r.t_valid_to, $future) > $when
-            RETURN coalesce(a.id, a.name) AS source, coalesce(b.id, b.name) AS target,
-                   type(r) AS type, r.ricci_curvature AS ricci_curvature,
-                   r.p99_latency_ms AS p99_latency_ms, r.weight AS pheromone_weight,
-                   r.penalty AS dark_penalty, r.risk_score AS risk_score,
-                   r.is_fallback AS is_fallback, r.owner_a AS owner_a, r.owner_b AS owner_b,
-                   r.verified_by AS verified_by, r.failure_reason AS failure_reason
-            """,
-            {"when": when, "future": FAR_FUTURE},
-        )
+        if all_time:
+            links = self.query(
+                graph,
+                """
+                MATCH (a)-[r]->(b)
+                RETURN coalesce(a.id, a.name) AS source, coalesce(b.id, b.name) AS target,
+                       type(r) AS type, r.ricci_curvature AS ricci_curvature,
+                       r.p99_latency_ms AS p99_latency_ms, r.weight AS pheromone_weight,
+                       r.success_count AS success_count, r.last_updated AS last_updated,
+                       r.penalty AS dark_penalty, r.risk_score AS risk_score,
+                       r.is_fallback AS is_fallback, r.owner_a AS owner_a, r.owner_b AS owner_b,
+                       r.verified_by AS verified_by, r.failure_reason AS failure_reason,
+                       r.t_valid_from AS t_valid_from, r.t_valid_to AS t_valid_to,
+                       r.t_tx_created AS t_tx_created, r.t_tx_superseded AS t_tx_superseded,
+                       r.ttl_epoch AS ttl_epoch
+                """,
+            )
+        else:
+            links = self.query(
+                graph,
+                """
+                MATCH (a)-[r]->(b)
+                WHERE coalesce(r.t_valid_from, 0) <= $when
+                  AND coalesce(r.t_valid_to, $future) > $when
+                RETURN coalesce(a.id, a.name) AS source, coalesce(b.id, b.name) AS target,
+                       type(r) AS type, r.ricci_curvature AS ricci_curvature,
+                       r.p99_latency_ms AS p99_latency_ms, r.weight AS pheromone_weight,
+                       r.success_count AS success_count, r.last_updated AS last_updated,
+                       r.penalty AS dark_penalty, r.risk_score AS risk_score,
+                       r.is_fallback AS is_fallback, r.owner_a AS owner_a, r.owner_b AS owner_b,
+                       r.verified_by AS verified_by, r.failure_reason AS failure_reason,
+                       r.t_valid_from AS t_valid_from, r.t_valid_to AS t_valid_to,
+                       r.t_tx_created AS t_tx_created, r.t_tx_superseded AS t_tx_superseded,
+                       r.ttl_epoch AS ttl_epoch
+                """,
+                {"when": when, "future": FAR_FUTURE},
+            )
         # Memory edges have no valid-time. Always include them when viewing "now".
         if when >= int(meta.get("incident") or when):
             memory = self.query(
