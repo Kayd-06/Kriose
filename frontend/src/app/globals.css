@@ -1,0 +1,19 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body {
+  background: #10120f;
+  color: #e7e4d8;
+  min-height: 100%;
+}
+
+body {
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+}
+
+button,
+input {
+  font-family: inherit;
+}
