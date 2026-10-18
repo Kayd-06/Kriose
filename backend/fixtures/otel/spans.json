@@ -1,0 +1,10 @@
+[
+  {
+    "name": "tokenvault.get",
+    "service": "Token-Vault-Cache",
+    "upstream": "Payment-Core",
+    "p99_latency_ms": 190,
+    "error_rate": 0.04,
+    "current_load": 92
+  }
+]
