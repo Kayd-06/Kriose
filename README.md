@@ -264,7 +264,7 @@ docker compose up --build
 | Workstation | http://localhost:3001 |
 | FalkorDB Browser | http://localhost:3000 |
 
-Seed, then open the workstation. It polls health every 5 seconds and loads the first tenant graph.
+Seed, then open the workstation. It polls health every 5 seconds and loads the first tenant graph. Click **Run the swarm on this incident**, or open http://localhost:3001/?demo=1 to run it automatically. Press `F` to zoom the schematic to fit.
 
 ```powershell
 curl.exe -X POST http://localhost:8000/api/v2/seed
@@ -282,7 +282,7 @@ $env:FALKORDB_HOST = "localhost"
 .\.venv\Scripts\python -m uvicorn main:app --app-dir backend --port 8000
 ```
 
-The engine connects to FalkorDB in its constructor. Start uvicorn only after `redis-cli` answers `PONG` on port 6379. A refused connection crashes the process on import.
+The engine connects to FalkorDB lazily. The API starts without it, `GET /api/v2/health` reports `ok: false` until FalkorDB answers, and the next call reconnects.
 
 ```powershell
 cd frontend

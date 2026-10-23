@@ -144,14 +144,23 @@ class KrioseEngine:
     def __init__(self, host: str | None = None, port: int | None = None):
         self.host = host or os.getenv("FALKORDB_HOST", "localhost")
         self.port = int(port or os.getenv("FALKORDB_PORT", "6379"))
-        self.db = FalkorDB(host=self.host, port=self.port)
+        self._db: FalkorDB | None = None
         self.times = clock()
+
+    @property
+    def db(self) -> FalkorDB:
+        # Connect lazily so the API can start (and /health can report ok:false)
+        # before FalkorDB is up. A failed connect is retried on the next call.
+        if self._db is None:
+            self._db = FalkorDB(host=self.host, port=self.port)
+        return self._db
 
     def ping(self) -> bool:
         try:
             self.db.list_graphs()
             return True
         except Exception:
+            self._db = None
             return False
 
     def query(self, name: str, cypher: str, params: dict | None = None) -> list[dict[str, Any]]:

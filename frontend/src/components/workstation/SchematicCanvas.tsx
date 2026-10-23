@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   blastRadius,
   computeOllivierRicciCurvature,
@@ -9,7 +9,7 @@ import {
   filterGraph,
   triadicClosureCandidate,
 } from "@/lib/graphMathEngine";
-import { NODE_H, NODE_W, strata } from "@/lib/layout";
+import { NODE_H, NODE_W, bounds, strata } from "@/lib/layout";
 import { nodeKinds } from "@/lib/memoryCypher";
 import { displayName } from "@/types/graph";
 import { INK, Led, fixed } from "./chrome";
@@ -42,7 +42,62 @@ export function SchematicCanvas({ session }: { session: Session }) {
   const kappaById = useMemo(() => new Map(ricci.map((row) => [row.id, row.kappa])), [ricci]);
   const root = session.selection?.kind === "node" ? session.selection.id : session.focusId;
   const blast = useMemo(() => (visible && root ? blastRadius(visible, root, at) : new Set<string>()), [at, root, visible]);
-  const points = session.lens === 3 && graph ? strata(graph.nodes) : session.positions;
+  const points = useMemo(
+    () => (session.lens === 3 && graph ? strata(graph.nodes) : session.positions),
+    [graph, session.lens, session.positions],
+  );
+
+  // Zoom-to-fit: frame every visible node inside this panel (never under the side panels).
+  const fit = useCallback(() => {
+    const node = viewport.current;
+    if (!node || !visible) return;
+    const box = bounds(points, visible.nodes.map((item) => item.id));
+    if (!box) return;
+    const pad = 56;
+    const top = 48; // leave room for the lens tabs
+    const w = node.clientWidth - pad * 2;
+    const h = node.clientHeight - pad - top;
+    if (w <= 0 || h <= 0) return;
+    const next = Math.min(1.25, Math.max(0.4, Math.min(w / box.width, h / box.height)));
+    setZoom(next);
+    setPan({
+      x: pad + (w - box.width * next) / 2 - box.minX * next,
+      y: top + (h - box.height * next) / 2 - box.minY * next,
+    });
+  }, [points, visible]);
+
+  const fitKey = `${graph?.graph ?? ""}|${visible?.nodes.length ?? 0}|${session.lens === 3 ? "strata" : "layers"}|${Object.keys(session.positions).length}`;
+  const lastFit = useRef("");
+  useEffect(() => {
+    if (!visible || lastFit.current === fitKey) return;
+    lastFit.current = fitKey;
+    fit();
+  }, [fit, fitKey, visible]);
+
+  const fitRef = useRef(fit);
+  fitRef.current = fit;
+  useEffect(() => {
+    const node = viewport.current;
+    if (!node || typeof ResizeObserver === "undefined") return;
+    let width = node.clientWidth;
+    let height = node.clientHeight;
+    const observer = new ResizeObserver(() => {
+      if (node.clientWidth === width && node.clientHeight === height) return;
+      width = node.clientWidth;
+      height = node.clientHeight;
+      fitRef.current();
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() === "f" && !event.metaKey && !event.ctrlKey && !typing(event.target)) fit();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [fit]);
 
   useEffect(() => {
     const node = viewport.current;
@@ -70,7 +125,7 @@ export function SchematicCanvas({ session }: { session: Session }) {
   return (
     <div
       ref={viewport}
-      className="relative min-w-0 flex-1 overflow-hidden"
+      className="relative isolate min-w-0 flex-1 overflow-hidden"
       style={{
         backgroundColor: INK.void,
         backgroundImage:
@@ -139,12 +194,30 @@ export function SchematicCanvas({ session }: { session: Session }) {
           </button>
         ))}
       </div>
+      {visible && (
+        <button
+          type="button"
+          onClick={fit}
+          title="Zoom to fit (F)"
+          className="absolute right-3 top-3 z-20 h-7 border px-2 font-mono text-[11px] text-[#8B93A7] hover:text-[#E2E8F0]"
+          style={{ background: INK.rack, borderColor: INK.line }}
+        >
+          [F] FIT
+        </button>
+      )}
       <span className="absolute left-0 top-0 z-20">
         <span className="sr-only">grid origin</span>
       </span>
       {!visible && (
-        <div className="absolute inset-0 flex items-center justify-center font-mono text-[12px] text-[#8B93A7]">
-          NO GRAPH LOADED · [I] INGEST OR [+ NEW]
+        <div className="absolute inset-0 flex items-center justify-center p-6 text-[#8B93A7]">
+          <div className="max-w-md text-center">
+            <div className="text-[15px] text-[#E2E8F0]">No incident graph loaded</div>
+            <div className="mt-2 text-[13px] leading-relaxed">
+              {session.health?.ok
+                ? "FalkorDB is up. Seed the demo with POST /api/v2/seed, or press [I] to ingest your own fixtures."
+                : "API or FalkorDB not reachable. Run `docker compose up`, then POST /api/v2/seed. Or press [I] to build a graph in memory."}
+            </div>
+          </div>
         </div>
       )}
       {visible && (
@@ -266,13 +339,13 @@ export function SchematicCanvas({ session }: { session: Session }) {
                 >
                   <div className="flex h-[14px] items-center gap-1 px-1" style={{ background: "#12161F" }}>
                     <Led color={node.kind === "Alert" ? INK.amber : INK.cyan} />
-                    <span className="font-mono text-[8px] tracking-wide text-[#8B93A7]">
+                    <span className="font-mono text-[9px] tracking-wide text-[#8B93A7]">
                       {node.kind.toUpperCase()}
                       {node.tier ? ` // T${node.tier}` : ""}
                     </span>
-                    <span className="ml-auto truncate font-mono text-[8px] text-[#8B93A7]">{node.id}</span>
+                    <span className="ml-auto truncate font-mono text-[9px] text-[#5C6578]">{node.id}</span>
                   </div>
-                  <div className="flex flex-1 items-center px-2 text-[12px]">{displayName(node)}</div>
+                  <div className="flex min-w-0 flex-1 items-center px-2 text-[13px] font-medium leading-tight" title={displayName(node)}><span className="truncate">{displayName(node)}</span></div>
                   <div className="flex items-center gap-1 px-1.5 pb-1 font-mono text-[10px] tabular-nums text-[#8B93A7]">
                     <span className="h-1 w-10 border" style={{ borderColor: INK.line }}>
                       <span className="block h-full" style={{ width: `${ratio * 100}%`, background: ratio > 1 ? INK.crimson : INK.cyan }} />

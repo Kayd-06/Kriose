@@ -103,7 +103,7 @@ export function InstrumentBar({ session }: { session: Session }) {
           )}
         </div>
       </div>
-      <div className="flex min-w-0 flex-1 items-stretch justify-center overflow-hidden">
+      <div className="flex min-w-0 flex-1 items-stretch justify-start overflow-hidden">
         <Cell label="TOPOLOGY" value={stats ? `${stats.nodes}V // ${stats.edges}E` : "n/a"} />
         <Cell label="MIN RICCI κ" value={stats ? `${fixed(stats.kappa)} [${stats.regime}]` : "n/a"} />
         <Cell label="CONWAY HOLES" value={stats ? `${stats.ghosts} GHOST_EDGES` : "n/a"} />
@@ -139,8 +139,8 @@ export function InstrumentBar({ session }: { session: Session }) {
 
 function Cell({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex min-w-[132px] flex-col justify-center border-l px-2" style={{ borderColor: INK.line }}>
-      <span className="font-mono text-[9px] tracking-wider text-[#8B93A7]">{label}</span>
+    <div className="flex min-w-0 flex-1 basis-0 flex-col justify-center border-l px-2" style={{ borderColor: INK.line }} title={`${label}: ${value}`}>
+      <span className="truncate whitespace-nowrap font-mono text-[10px] tracking-wider text-[#8B93A7]">{label}</span>
       <span className="truncate font-mono text-[11px] tabular-nums">{value}</span>
     </div>
   );
