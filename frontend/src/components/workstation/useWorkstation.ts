@@ -94,6 +94,9 @@ export function useWorkstation() {
   const [serverNote, setServerNote] = useState<string | null>(null);
   const [memoryOnly, setMemoryOnly] = useState(false);
   const [verdict, setVerdict] = useState<RunVerdict | null>(null);
+  // Raw events of the current/last swarm run and the graph as it was before it, for the Story view.
+  const [runEvents, setRunEvents] = useState<SwarmEvent[]>([]);
+  const [runBaseline, setRunBaseline] = useState<GraphData | null>(null);
 
   const connected = Boolean(health?.ok) && !memoryOnly;
 
@@ -255,6 +258,9 @@ export function useWorkstation() {
     }
     setBusy("SWARM");
     setError(null);
+    setRunEvents([]);
+    setVerdict(null);
+    setRunBaseline(graph);
     setAgents(idleAgents().map((cell) => ({ ...cell, state: "EXECUTING", elapsedMs: 0 })));
     try {
       const nameOf = (id: string) => {
@@ -267,6 +273,7 @@ export function useWorkstation() {
         const run: RunVerdict = { source: "FALKOR", alertId, winner: null, skipped: [], vetoed: [], ranked: 0, forked: 0, merged: false, finishedAt: 0 };
         const summaries: Partial<Record<AgentId, string>> = {};
         await streamSwarm(graph.tenant, alertId, (event: SwarmEvent) => {
+          setRunEvents((current) => [...current, event]);
           const agent = mapAgent(event.agent);
           if (agent) {
             setAgents((current) =>
@@ -571,6 +578,8 @@ export function useWorkstation() {
     logs,
     agents,
     verdict,
+    runEvents,
+    runBaseline,
     busy,
     error,
     chaos,
