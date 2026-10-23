@@ -11,8 +11,8 @@ module.exports = {
         clay: "#e07a4a",
       },
       fontFamily: {
-        mono: ["JetBrains Mono", "ui-monospace", "monospace"],
-        sans: ["IBM Plex Sans", "Segoe UI", "sans-serif"],
+        mono: ["var(--font-mono)", "ui-monospace", "monospace"],
+        sans: ["var(--font-sans)", "Inter", "system-ui", "sans-serif"],
       },
     },
   },

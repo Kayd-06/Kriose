@@ -2,6 +2,20 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --bg: #0b0d12;
+  --card: #161a24;
+  --card-hi: #1d2230;
+  --line: #2e3546;
+  --text: #f1f4f9;
+  --sub: #b4bccb;
+  --mute: #7a8399;
+  --accent: #7c8cff;
+  --green: #34d399;
+  --amber: #fbbf24;
+  --red: #f87171;
+}
+
 html,
 body {
   font-size: 13px;
@@ -13,7 +27,7 @@ body {
 
 body {
   font-size: 13px;
-  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+  font-family: var(--font-sans), system-ui, sans-serif;
 }
 
 button,
@@ -21,6 +35,10 @@ input,
 select,
 textarea {
   font-family: inherit;
+}
+
+.font-mono {
+  font-family: var(--font-mono), ui-monospace, monospace;
 }
 
 .font-mono,
@@ -38,4 +56,22 @@ select {
 ::selection {
   background: #163044;
   color: #e2e8f0;
+}
+
+@keyframes story-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+.story-in { animation: story-in 400ms ease-out both; }
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+.fade-up { animation: fade-up 500ms cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.lift { transition: transform 300ms ease, box-shadow 300ms ease, border-color 400ms ease, background 400ms ease; }
+.lift:hover { transform: translateY(-2px); }
+@media (prefers-reduced-motion: reduce) {
+  .fade-up, .story-in { animation: none; }
+  .lift, .lift:hover { transition: none; transform: none; }
 }

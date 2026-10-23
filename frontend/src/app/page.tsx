@@ -1,7 +1,7 @@
 "use client";
 
-import Workstation from "@/components/workstation/Workstation";
+import App from "@/components/story/App";
 
 export default function Page() {
-  return <Workstation />;
+  return <App />;
 }
