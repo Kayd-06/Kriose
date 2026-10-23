@@ -4,20 +4,30 @@ import { useEffect, useMemo, useState } from "react";
 import type { Session } from "@/components/workstation/useWorkstation";
 import { demoActive } from "@/services/falkorClient";
 import { resetDemoRun } from "@/services/demoBackend";
+import { Logo } from "./Logo";
 import { buildStory, candidateFixes, personName, shortName, type FixStory, type StepState } from "./storyModel";
 
+// Single source of colour for the friendly UI. Mirrors the CSS variables in globals.css.
 export const TONE = {
   bg: "#0B0D12",
-  card: "#141822",
-  cardHi: "#1A1F2B",
-  line: "#2A3040",
-  text: "#EEF1F6",
-  sub: "#A9B1C2",
-  mute: "#6F7890",
+  card: "#161A24",
+  cardHi: "#1D2230",
+  line: "#2E3546",
+  text: "#F1F4F9",
+  sub: "#B4BCCB",
+  mute: "#7A8399",
   accent: "#7C8CFF",
   green: "#34D399",
   amber: "#FBBF24",
   red: "#F87171",
+};
+
+/** One meaning per colour, everywhere. */
+export const STATUS = {
+  chosen: { color: TONE.green, label: "Chosen", hint: "survived every test and was applied" },
+  skipped: { color: TONE.amber, label: "Skipped", hint: "broke things before, not re-tried" },
+  vetoed: { color: TONE.red, label: "Rejected", hint: "failed the stress test" },
+  testing: { color: TONE.accent, label: "Testing", hint: "running on a copy right now" },
 };
 
 const REVEAL_MS = 750;
@@ -62,6 +72,18 @@ export function StoryView({ session, onAdvanced }: { session: Session; onAdvance
     void session.execute();
   };
 
+  const [hero, setHero] = useState(false);
+  useEffect(() => {
+    if (window.localStorage.getItem("kriose.heroSeen") !== "1" && !new URLSearchParams(window.location.search).has("demo")) setHero(true);
+  }, []);
+  const startFromHero = () => {
+    window.localStorage.setItem("kriose.heroSeen", "1");
+    setHero(false);
+    window.setTimeout(run, 500);
+  };
+
+  if (hero) return <Hero onStart={startFromHero} onSkip={() => { window.localStorage.setItem("kriose.heroSeen", "1"); setHero(false); }} ready={Boolean(session.graph && session.alertId)} />;
+
   if (!session.graph) {
     return (
       <div className="mx-auto mt-24 max-w-xl text-center" style={{ color: TONE.sub }}>
@@ -87,7 +109,7 @@ export function StoryView({ session, onAdvanced }: { session: Session; onAdvance
           {alert?.severity ? `${alert.severity.toLowerCase()} alert` : "Alert"}
         </div>
         <h2 className="mt-2 text-[26px] font-semibold leading-tight" style={{ color: TONE.text }}>
-          {focus ? focus.name : "A service"} is {pct !== null ? `at ${pct}% of capacity` : "in trouble"} and slowing everything that depends on it.
+          {focus ? focus.name : "A service"} is {pct !== null ? <>at <span className="font-mono" style={{ color: TONE.red }}>{pct}%</span> of capacity</> : "in trouble"} and slowing everything that depends on it.
         </h2>
         {pct !== null && (
           <div className="mt-4 h-2.5 w-full max-w-md overflow-hidden rounded-full" style={{ background: TONE.line }}>
@@ -123,10 +145,12 @@ export function StoryView({ session, onAdvanced }: { session: Session; onAdvance
       </div>
 
       <div className="mt-4 grid gap-4 md:grid-cols-3">
-        {fixes.map((fix) => (
-          <FixCard key={fix.id} fix={fix} />
+        {fixes.map((fix, index) => (
+          <FixCard key={fix.id} fix={fix} index={index} />
         ))}
       </div>
+
+      <Legend />
 
       {story.stress && (
         <p className="mt-3 text-[13px]" style={{ color: TONE.mute }}>
@@ -172,6 +196,58 @@ export function StoryView({ session, onAdvanced }: { session: Session; onAdvance
   );
 }
 
+function Hero({ onStart, onSkip, ready }: { onStart: () => void; onSkip: () => void; ready: boolean }) {
+  return (
+    <div className="relative mx-auto flex min-h-[80vh] max-w-4xl flex-col items-center justify-center px-6 text-center">
+      <div className="pointer-events-none absolute inset-0 -z-0 opacity-60" style={{ background: `radial-gradient(600px 300px at 50% 35%, ${TONE.accent}33, transparent 70%)` }} />
+      <div className="fade-up relative">
+        <Logo size={44} wordmark={false} />
+      </div>
+      <h1 className="fade-up relative mt-6 text-[44px] font-semibold leading-[1.08] tracking-tight md:text-[56px]" style={{ color: TONE.text, animationDelay: "80ms" }}>
+        Before you hit restart,
+        <br />
+        <span style={{ color: TONE.accent }}>know if it&apos;ll make things worse.</span>
+      </h1>
+      <p className="fade-up relative mt-5 max-w-2xl text-[17px] leading-relaxed" style={{ color: TONE.sub, animationDelay: "160ms" }}>
+        Kriose remembers which fixes broke things last time, tries every fix on a copy of your system, stress-tests the copy, and only applies the one that survives.
+      </p>
+      <div className="fade-up relative mt-8 flex flex-wrap justify-center gap-3" style={{ animationDelay: "240ms" }}>
+        <button type="button" onClick={onStart} disabled={!ready} className="rounded-xl px-6 py-3.5 text-[16px] font-semibold shadow-lg transition hover:brightness-110 disabled:opacity-60" style={{ background: TONE.accent, color: "#0B0D12", boxShadow: `0 10px 30px -10px ${TONE.accent}` }}>
+          {ready ? "See it handle an incident →" : "Loading the demo incident…"}
+        </button>
+        <button type="button" onClick={onSkip} className="rounded-xl border px-5 py-3.5 text-[15px] font-medium" style={{ borderColor: TONE.line, color: TONE.sub }}>
+          Skip intro
+        </button>
+      </div>
+      <div className="fade-up relative mt-12 grid w-full max-w-3xl gap-3 text-left sm:grid-cols-3" style={{ animationDelay: "320ms" }}>
+        {[
+          ["1", "Remembers", "Fixes that caused outages before are skipped, even ones seen at other companies."],
+          ["2", "Rehearses", "Each remaining fix runs on a sandbox copy, then gets hit with a traffic spike."],
+          ["3", "Decides", "Only a fix that survives is applied, and the result is remembered."],
+        ].map(([n, title, body]) => (
+          <div key={n} className="rounded-xl border p-4" style={{ borderColor: TONE.line, background: TONE.card }}>
+            <div className="text-[13px] font-semibold" style={{ color: TONE.accent }}>{n} · {title}</div>
+            <div className="mt-1 text-[13px]" style={{ color: TONE.sub }}>{body}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function Legend() {
+  return (
+    <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-[12px]" style={{ color: TONE.mute }}>
+      {Object.values(STATUS).map((item) => (
+        <span key={item.label} className="inline-flex items-center gap-1.5">
+          <span className="h-2.5 w-2.5 rounded-full" style={{ background: item.color }} />
+          <span style={{ color: TONE.sub }}>{item.label}</span> {item.hint}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function Stepper({ step }: { step: number }) {
   const steps = ["Read the alert", "Test the fixes", "See the safe choice"];
   return (
@@ -199,19 +275,19 @@ const PHASE: Record<FixStory["phase"], { label: string; color: string }> = {
   memory: { label: "Checking memory…", color: TONE.accent },
   sandbox: { label: "Trying it on a copy…", color: TONE.accent },
   stress: { label: "Stress-testing the copy…", color: TONE.accent },
-  skipped: { label: "Skipped", color: TONE.amber },
-  vetoed: { label: "Rejected", color: TONE.red },
-  passed: { label: "Passed", color: TONE.green },
-  chosen: { label: "Chosen", color: TONE.green },
+  skipped: { label: STATUS.skipped.label, color: STATUS.skipped.color },
+  vetoed: { label: STATUS.vetoed.label, color: STATUS.vetoed.color },
+  passed: { label: "Passed", color: STATUS.chosen.color },
+  chosen: { label: STATUS.chosen.label, color: STATUS.chosen.color },
 };
 
-function FixCard({ fix }: { fix: FixStory }) {
+function FixCard({ fix, index }: { fix: FixStory; index: number }) {
   const phase = PHASE[fix.phase];
   const busy = fix.phase === "memory" || fix.phase === "sandbox" || fix.phase === "stress";
   return (
     <article
-      className="flex flex-col rounded-2xl border p-5 transition-all duration-500"
-      style={{ background: TONE.card, borderColor: busy ? TONE.accent : fix.phase === "waiting" ? TONE.line : `${phase.color}88`, boxShadow: busy ? `0 0 0 3px ${TONE.accent}22` : undefined }}
+      className="lift fade-up flex flex-col rounded-2xl border p-5"
+      style={{ background: TONE.card, borderColor: busy ? TONE.accent : fix.phase === "waiting" ? TONE.line : `${phase.color}88`, boxShadow: busy ? `0 0 0 3px ${TONE.accent}22, 0 12px 30px -12px ${TONE.accent}55` : fix.phase === "chosen" ? `0 12px 30px -14px ${TONE.green}88` : undefined, animationDelay: `${index * 90}ms` }}
     >
       <div className="flex items-center justify-between">
         <span className="text-[17px] font-semibold" style={{ color: TONE.text }}>{fix.short}</span>

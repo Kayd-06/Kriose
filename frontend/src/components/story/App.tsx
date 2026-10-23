@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Workstation from "@/components/workstation/Workstation";
 import { useWorkstation } from "@/components/workstation/useWorkstation";
+import { Logo } from "./Logo";
 import { StoryView, TONE } from "./StoryView";
 
 type View = "story" | "advanced";
@@ -28,7 +29,7 @@ export default function App() {
     <div className="flex h-screen w-screen flex-col overflow-hidden" style={{ background: TONE.bg }}>
       <header className="flex h-12 shrink-0 items-center justify-between border-b px-4" style={{ borderColor: TONE.line, background: TONE.bg }}>
         <div className="flex items-center gap-3">
-          <span className="text-[16px] font-bold tracking-tight" style={{ color: TONE.text }}>Kriose</span>
+          <Logo size={22} />
           <span className="hidden text-[13px] md:inline" style={{ color: TONE.mute }}>
             Tests your fixes on a copy before they touch production.
           </span>
