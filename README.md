@@ -65,6 +65,12 @@ Shortcut: http://localhost:3001/?demo=1 runs the swarm automatically. Stop every
 
 ![Advanced view](docs/screenshot-advanced.png)
 
+## Try it on your own system
+
+Click **Try your own system** and paste a short YAML file. It lists your services (load and capacity), what calls what, the owners, your runbook fixes and the alert that is firing. You can also paste OTel spans. Kriose then tests your fixes the same way. You can [download a template](frontend/public/templates/kriose-system.yaml) to start from. See [docs/bring-your-own-system.md](docs/bring-your-own-system.md) for the format.
+
+![Your own system](docs/screenshot-byo.png)
+
 ## How it works
 ```mermaid
 flowchart LR

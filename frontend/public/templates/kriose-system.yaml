@@ -1,0 +1,49 @@
+# Kriose: describe your own system, then run the swarm on it.
+# Upload this file (or paste it) in "Try your own system". Edit freely.
+name: Corner Shop
+alert:
+  title: Cart API p99 above 2s, CPU at 94%
+  service: cart            # the service that is paging
+services:
+  - id: web
+    name: Web Storefront
+    load: 45               # current load, any unit (req/s, % CPU...)
+    capacity: 100          # load at which it falls over
+    public: true           # receives internet traffic
+    owner: maya
+  - id: cart
+    name: Cart API
+    load: 90
+    capacity: 100
+    pii: true
+    owner: dev
+  - id: cart-standby
+    name: Cart API (standby)
+    load: 10
+    capacity: 100
+    standby_for: cart      # where a reroute can send traffic
+    owner: dev
+  - id: db
+    name: Orders DB
+    load: 55
+    capacity: 100
+    owner: dev
+dependencies:              # from calls to
+  - { from: web, to: cart, p99_ms: 180 }
+  - { from: cart, to: db, p99_ms: 25 }
+  - { from: cart-standby, to: db, p99_ms: 25 }
+owners:
+  - { id: maya, name: Maya Ortiz, slack: "@maya" }
+  - { id: dev, name: Dev Patel, slack: "@dev" }
+runbook:                   # fixes you would try (restart, throttle, reroute)
+  - type: restart
+    name: Restart Cart API pods
+    cost: 1
+    past_successes: 5
+    broke_before: Restart dropped every cart session on 2026-09-14
+  - type: throttle
+    cost: 2
+    past_successes: 2
+  - type: reroute
+    cost: 1
+    past_successes: 3

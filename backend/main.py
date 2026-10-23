@@ -78,6 +78,32 @@ class GraphBody(BaseModel):
     tenant: str = Field(min_length=1, max_length=64)
 
 
+class ImportBody(BaseModel):
+    system: dict | list | None = None
+    text: str | None = None
+
+
+@app.post("/api/v2/import")
+def import_system(body: ImportBody):
+    """Load a user's own system (YAML/JSON text or a parsed object) as a tenant."""
+    require_db()
+    import byo
+    import yaml
+
+    raw = body.system
+    if raw is None:
+        try:
+            raw = yaml.safe_load(body.text or "")
+        except yaml.YAMLError as exc:
+            mark = getattr(exc, "problem_mark", None)
+            where = f" on line {mark.line + 1}" if mark else ""
+            raise HTTPException(status_code=422, detail={"errors": [f"That isn't valid YAML or JSON{where}."]})
+    try:
+        return byo.seed(engine, raw)
+    except byo.SpecError as exc:
+        raise HTTPException(status_code=422, detail={"errors": exc.errors})
+
+
 @app.get("/api/v2/graph")
 def graph(tenant: str = "", graph: str = "", at_time: int = 0, all_time: int = 0):
     require_db()

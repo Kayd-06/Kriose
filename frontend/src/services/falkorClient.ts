@@ -1,6 +1,6 @@
 import type { GraphData, GraphEdge, GraphNode, HiveMotif, SwarmEvent } from "@/types/graph";
 import { edgeIdentity, flag, num, text } from "@/types/graph";
-import { demoActive, demoForced, demoGraph, demoHealth, demoHive, demoStream, enableAutoDemo } from "./demoBackend";
+import { demoActive, demoForced, demoGraph, demoHealth, demoHive, demoStream, enableAutoDemo, putCustomGraph } from "./demoBackend";
 
 export { demoActive } from "./demoBackend";
 
@@ -222,4 +222,32 @@ export async function streamSwarm(
       onEvent(JSON.parse(line.slice(6)) as SwarmEvent);
     }
   }
+}
+
+/**
+ * Load a user's own system (YAML/JSON text). Live: POST /api/v2/import seeds a
+ * tenant graph in FalkorDB. Demo mode: validated and simulated in the browser.
+ * Throws SpecError with friendly messages on bad input. Returns the tenant.
+ */
+export async function importSystem(text: string): Promise<{ tenant: string; estimated: boolean }> {
+  const { normalize, parseText, simulate, snapshot, SpecError } = await import("@/byo/system");
+  const parsed = parseText(text);
+  if (demoActive()) {
+    const sys = normalize(parsed);
+    const { run, after } = simulate(sys);
+    putCustomGraph(sys.tenant, snapshot(sys), run, after);
+    return { tenant: sys.tenant, estimated: true };
+  }
+  normalize(parsed); // same checks the API runs, so errors show instantly
+  const response = await fetch(apiUrl("/import"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ system: parsed }),
+  });
+  if (response.status === 422) {
+    const body = (await response.json().catch(() => ({}))) as { detail?: { errors?: string[] } };
+    throw new SpecError(body.detail?.errors ?? ["The API rejected this file."]);
+  }
+  const body = await readJson<{ tenant: string }>(response);
+  return { tenant: body.tenant, estimated: false };
 }

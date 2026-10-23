@@ -30,12 +30,15 @@ export function enableAutoDemo(): void {
 
 export function resetDemoRun(): void {
   ran = false;
+  for (const key of [...custom.keys()]) if (key.startsWith("before:")) custom.set(`graph:${key.slice(7)}`, custom.get(key));
 }
 
 /** Register a user-supplied graph (bring-your-own-system) for demo mode. */
-export function putCustomGraph(tenant: string, body: unknown, run: Recorded[]): void {
+export function putCustomGraph(tenant: string, body: unknown, run: Recorded[], after?: unknown): void {
   custom.set(`graph:${tenant}`, body);
+  custom.set(`before:${tenant}`, body);
   custom.set(`run:${tenant}`, run);
+  if (after) custom.set(`after:${tenant}`, after);
 }
 
 async function asset<T>(name: string): Promise<T> {
@@ -75,4 +78,5 @@ export async function demoStream(tenant: string, onEvent: (event: SwarmEvent) =>
     onEvent(item.event);
   }
   if (!custom.has(`run:${tenant}`)) ran = true;
+  else if (custom.has(`after:${tenant}`)) custom.set(`graph:${tenant}`, custom.get(`after:${tenant}`));
 }

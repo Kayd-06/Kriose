@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { Session } from "@/components/workstation/useWorkstation";
 import { demoActive } from "@/services/falkorClient";
 import { resetDemoRun } from "@/services/demoBackend";
+import { ImportPanel } from "./ImportPanel";
 import { Logo } from "./Logo";
 import { buildStory, candidateFixes, personName, shortName, type FixStory, type StepState } from "./storyModel";
 
@@ -73,6 +74,21 @@ export function StoryView({ session, onAdvanced }: { session: Session; onAdvance
   };
 
   const [hero, setHero] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [estimated, setEstimated] = useState(false);
+  const own = session.graph?.tenant.startsWith("byo_") ?? false;
+  const importPanel = importing ? (
+    <ImportPanel
+      onClose={() => setImporting(false)}
+      onLoaded={(tenant, guess) => {
+        setImporting(false);
+        setEstimated(guess);
+        setHero(false);
+        if (demoActive()) resetDemoRun();
+        void session.openGraph(tenant);
+      }}
+    />
+  ) : null;
   useEffect(() => {
     if (window.localStorage.getItem("kriose.heroSeen") !== "1" && !new URLSearchParams(window.location.search).has("demo")) setHero(true);
   }, []);
@@ -82,7 +98,8 @@ export function StoryView({ session, onAdvanced }: { session: Session; onAdvance
     window.setTimeout(run, 500);
   };
 
-  if (hero) return <Hero onStart={startFromHero} onSkip={() => { window.localStorage.setItem("kriose.heroSeen", "1"); setHero(false); }} ready={Boolean(session.graph && session.alertId)} />;
+  const skipHero = () => { window.localStorage.setItem("kriose.heroSeen", "1"); setHero(false); };
+  if (hero) return <>{importPanel}<Hero onStart={startFromHero} onSkip={skipHero} onOwn={() => { skipHero(); setImporting(true); }} ready={Boolean(session.graph && session.alertId)} /></>;
 
   if (!session.graph) {
     return (
@@ -98,7 +115,20 @@ export function StoryView({ session, onAdvanced }: { session: Session; onAdvance
 
   return (
     <div className="mx-auto w-full max-w-5xl px-6 pb-16 pt-6">
+      {importPanel}
       <Stepper step={step} />
+      {own && (
+        <div className="fade-up mt-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border px-4 py-2.5 text-[13px]" style={{ borderColor: `${TONE.accent}66`, background: `${TONE.accent}12`, color: TONE.sub }}>
+          <span>
+            <b style={{ color: TONE.text }}>Your system</b>
+            {estimated ? " · hosted demo: tested in your browser with the capacity check only. Run the API for the full set of checks." : " · loaded into the API as its own graph."}
+          </span>
+          <span className="flex gap-3">
+            <button type="button" onClick={() => setImporting(true)} style={{ color: TONE.accent }}>Edit</button>
+            <button type="button" onClick={() => { if (demoActive()) resetDemoRun(); void session.openGraph("org_acme"); }} style={{ color: TONE.accent }}>Back to the demo incident</button>
+          </span>
+        </div>
+      )}
 
       <section className="mt-6 rounded-2xl border p-6" style={{ background: TONE.card, borderColor: `${TONE.red}55` }}>
         <div className="flex items-center gap-2 text-[12px] font-semibold uppercase tracking-wider" style={{ color: TONE.red }}>
@@ -190,13 +220,14 @@ export function StoryView({ session, onAdvanced }: { session: Session; onAdvance
         running={running}
         onRun={run}
         onAdvanced={onAdvanced}
+        onOwn={() => setImporting(true)}
         disabled={session.busy !== null || !session.alertId}
       />
     </div>
   );
 }
 
-function Hero({ onStart, onSkip, ready }: { onStart: () => void; onSkip: () => void; ready: boolean }) {
+function Hero({ onStart, onSkip, onOwn, ready }: { onStart: () => void; onSkip: () => void; onOwn: () => void; ready: boolean }) {
   return (
     <div className="relative mx-auto flex min-h-[80vh] max-w-4xl flex-col items-center justify-center px-6 text-center">
       <div className="pointer-events-none absolute inset-0 -z-0 opacity-60" style={{ background: `radial-gradient(600px 300px at 50% 35%, ${TONE.accent}33, transparent 70%)` }} />
@@ -219,6 +250,9 @@ function Hero({ onStart, onSkip, ready }: { onStart: () => void; onSkip: () => v
           Skip intro
         </button>
       </div>
+      <button type="button" onClick={onOwn} className="fade-up relative mt-4 text-[14px] underline-offset-4 hover:underline" style={{ color: TONE.sub, animationDelay: "280ms" }}>
+        or try it on your own system (YAML, JSON or OTel spans)
+      </button>
       <div className="fade-up relative mt-12 grid w-full max-w-3xl gap-3 text-left sm:grid-cols-3" style={{ animationDelay: "320ms" }}>
         {[
           ["1", "Remembers", "Fixes that caused outages before are skipped, even ones seen at other companies."],
@@ -329,15 +363,15 @@ function Step({ state, label }: { state: StepState; label: string }) {
   );
 }
 
-function NextStep({ started, done, running, onRun, onAdvanced, disabled }: { started: boolean; done: boolean; running: boolean; onRun: () => void; onAdvanced: () => void; disabled: boolean }) {
+function NextStep({ started, done, running, onRun, onAdvanced, onOwn, disabled }: { started: boolean; done: boolean; running: boolean; onRun: () => void; onAdvanced: () => void; onOwn: () => void; disabled: boolean }) {
   let title = "Next step: test the fixes";
   let body = "Kriose will check its memory, then try each fix on a sandbox copy and stress-test it. Nothing touches the real system until a fix survives.";
   if (running) {
     title = "Testing…";
     body = "Watch each card: memory check, sandbox copy, stress test.";
   } else if (done) {
-    title = "Next step: run it again, or look under the hood";
-    body = "Run it again and Kriose starts from what it just learned. The advanced view shows the system map, the sandbox copies, and the maths behind each decision.";
+    title = "Next step: try it on your own system";
+    body = "Paste a short YAML file with your services, owners, runbook and the alert, or OTel spans, and watch Kriose test your fixes. The advanced view shows the system map, the sandbox copies, and the maths behind each decision.";
   }
   return (
     <section className="mt-10 flex flex-wrap items-center justify-between gap-4 rounded-2xl border p-5" style={{ background: TONE.cardHi, borderColor: TONE.line }}>
@@ -356,6 +390,9 @@ function NextStep({ started, done, running, onRun, onAdvanced, disabled }: { sta
             ↻ Run it again
           </button>
         )}
+        <button type="button" onClick={onOwn} className="rounded-xl px-4 py-2.5 text-[14px] font-semibold" style={done ? { background: TONE.accent, color: "#0B0D12" } : { border: `1px solid ${TONE.line}`, color: TONE.text }}>
+          Try your own system
+        </button>
         <button type="button" onClick={onAdvanced} className="rounded-xl border px-4 py-2.5 text-[14px] font-semibold" style={{ borderColor: TONE.line, color: TONE.text }}>
           Advanced view →
         </button>

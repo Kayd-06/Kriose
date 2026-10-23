@@ -1,0 +1,43 @@
+{
+  "name": "From OTel spans",
+  "alert": {
+    "title": "Token-Vault-Cache p99 above 190ms",
+    "service": "token_vault_cache"
+  },
+  "spans": [
+    {
+      "name": "checkout.post",
+      "service": "Checkout",
+      "upstream": "Web",
+      "p99_latency_ms": 60,
+      "error_rate": 0.01,
+      "current_load": 40
+    },
+    {
+      "name": "payment.charge",
+      "service": "Payment-Core",
+      "upstream": "Checkout",
+      "p99_latency_ms": 45,
+      "error_rate": 0.02,
+      "current_load": 70
+    },
+    {
+      "name": "tokenvault.get",
+      "service": "Token-Vault-Cache",
+      "upstream": "Payment-Core",
+      "p99_latency_ms": 190,
+      "error_rate": 0.04,
+      "current_load": 92
+    }
+  ],
+  "runbook": [
+    {
+      "type": "restart",
+      "past_successes": 4
+    },
+    {
+      "type": "throttle",
+      "past_successes": 2
+    }
+  ]
+}

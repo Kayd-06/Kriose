@@ -370,12 +370,13 @@ class KrioseEngine:
             MATCH (m:TopologyMap {id: 'map'})
             RETURN m.checkout AS checkout, m.payment AS payment, m.token AS token,
                    m.standby AS standby, m.fraud AS fraud, m.ledger AS ledger,
-                   m.token_owner AS token_owner, m.payment_owner AS payment_owner
+                   m.token_owner AS token_owner, m.payment_owner AS payment_owner,
+                   coalesce(m.custom, false) AS custom
             """,
         )
         if not rows:
             raise RuntimeError(f"no topology map on {graph}")
-        return {key: str(value) for key, value in rows[0].items()}
+        return {key: str(value) for key, value in rows[0].items() if key != "custom" or value}
 
     def meta(self, graph: str) -> dict[str, Any]:
         rows = self.query(
@@ -790,6 +791,11 @@ class KrioseEngine:
         return min(vals) if vals else 0.0
 
     def apply_mutation(self, graph: str, action_type: str, roles: dict[str, str], now: int) -> None:
+        if roles.get("custom"):
+            import byo
+
+            byo.apply_mutation(self, graph, action_type, roles, now)
+            return
         if action_type == "THROTTLE":
             self.query(
                 graph,
