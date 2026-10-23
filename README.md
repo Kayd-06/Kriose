@@ -13,6 +13,17 @@
 
 Kriose stores everything in a [FalkorDB](https://www.falkordb.com/) graph. Four agents (Scout, ShadowArchitect, Nemesis, Arbiter) coordinate by reading and writing edges, and each "sandbox" is a `GRAPH.COPY` of the real graph.
 
+## Try it live (no install)
+
+The workstation has a frontend-only **demo mode** that replays a run recorded from the real backend: the seeded Acme graph plus every swarm event, paced so you can follow it. It turns on when `NEXT_PUBLIC_DEMO_MODE=1`, when you add `?demo-data=1` to the URL, or automatically when the API can't be reached (add `?live=1` to opt out). The top bar shows `DEMO · RECORDED` when it's active.
+
+Deploy your own copy on Vercel:
+
+1. Import the repo on [vercel.com/new](https://vercel.com/new) and set **Root Directory** to `frontend`. `frontend/vercel.json` already sets `NEXT_PUBLIC_DEMO_MODE=1`.
+2. Or from the CLI: `cd frontend && vercel deploy`
+
+Re-record the demo data from a running stack with `scripts/record-demo.sh`.
+
 ## Prerequisites
 
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Windows/macOS), or Docker Engine with the Compose v2 plugin on Linux. Make sure it is running.
