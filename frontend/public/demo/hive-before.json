@@ -1,0 +1,1 @@
+{"graph":"kriose_global_hive_immunology","motifs":[{"wl_hash":"9fece2ae4ca6d730","canonical_signature":"Service|t1|d1|kfrag|Service|t1|d2to3|khyper|Service|t1|d2to3|khyper|Service|t2|d2to3|khyper|Service|t2|d2to3|khyper","hit_count":1,"action_type":"RESTART","failure_mode":"cold-cache OOM stampede","confidence":0.92,"tenant_confirmations":1}]}

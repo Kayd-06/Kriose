@@ -1,5 +1,8 @@
 import type { GraphData, GraphEdge, GraphNode, HiveMotif, SwarmEvent } from "@/types/graph";
 import { edgeIdentity, flag, num, text } from "@/types/graph";
+import { demoActive, demoForced, demoGraph, demoHealth, demoHive, demoStream, enableAutoDemo } from "./demoBackend";
+
+export { demoActive } from "./demoBackend";
 
 const RAW = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000/api/v2";
 
@@ -22,8 +25,15 @@ async function readJson<T>(response: Response): Promise<T> {
 
 export async function ping(): Promise<Health> {
   const started = performance.now();
+  if (demoActive()) {
+    const body = await demoHealth();
+    return { ...body, latencyMs: 0 };
+  }
   try {
-    const response = await fetch(apiUrl("/health"), { cache: "no-store" });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 4000);
+    const response = await fetch(apiUrl("/health"), { cache: "no-store", signal: controller.signal });
+    clearTimeout(timer);
     const body = await readJson<{ ok?: boolean; graphs?: string[] }>(response);
     return {
       ok: Boolean(body.ok),
@@ -31,6 +41,11 @@ export async function ping(): Promise<Health> {
       latencyMs: Math.round(performance.now() - started),
     };
   } catch {
+    // API unreachable (e.g. static hosting): fall back to the recorded demo.
+    if (!demoForced()) {
+      enableAutoDemo();
+      if (demoActive()) return { ...(await demoHealth()), latencyMs: 0 };
+    }
     return { ok: false, graphs: [], latencyMs: Math.round(performance.now() - started) };
   }
 }
@@ -99,15 +114,16 @@ function asEdge(raw: Record<string, unknown>): GraphEdge | null {
 }
 
 export async function loadGraph(tenant: string): Promise<GraphData> {
-  const response = await fetch(apiUrl(`/graph?tenant=${encodeURIComponent(tenant)}&all_time=1`), { cache: "no-store" });
-  const body = await readJson<{
+  const body = (demoActive()
+    ? await demoGraph(tenant)
+    : await readJson(await fetch(apiUrl(`/graph?tenant=${encodeURIComponent(tenant)}&all_time=1`), { cache: "no-store" }))) as {
     tenant?: string;
     at_time?: number;
     baseline?: number;
     incident?: number;
     nodes?: Record<string, unknown>[];
     links?: Record<string, unknown>[];
-  }>(response);
+  };
   const nodes = (body.nodes ?? []).map(asNode).filter((node): node is GraphNode => Boolean(node));
   const ids = new Set(nodes.map((node) => node.id));
   const edges = (body.links ?? [])
@@ -126,8 +142,9 @@ export async function loadGraph(tenant: string): Promise<GraphData> {
 }
 
 export async function loadHive(): Promise<HiveMotif[]> {
-  const response = await fetch(apiUrl("/hivemind"), { cache: "no-store" });
-  const body = await readJson<{ motifs?: Record<string, unknown>[] }>(response);
+  const body = (demoActive()
+    ? await demoHive()
+    : await readJson(await fetch(apiUrl("/hivemind"), { cache: "no-store" }))) as { motifs?: Record<string, unknown>[] };
   return (body.motifs ?? []).map((row) => ({
     wl_hash: text(row.wl_hash) || "",
     action_type: text(row.action_type) || "",
@@ -138,6 +155,7 @@ export async function loadHive(): Promise<HiveMotif[]> {
 }
 
 export async function createTenant(tenant: string): Promise<void> {
+  if (demoActive()) throw new Error("Not available in the hosted demo. Run locally with docker compose to edit the graph.");
   const response = await fetch(apiUrl("/graphs"), {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -147,6 +165,7 @@ export async function createTenant(tenant: string): Promise<void> {
 }
 
 export async function runCypher(graph: string, cypher: string): Promise<{ count: number; rows: unknown[] }> {
+  if (demoActive()) throw new Error("Not available in the hosted demo. Run locally with docker compose to edit the graph.");
   const response = await fetch(apiUrl("/cypher"), {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -169,6 +188,7 @@ export async function publishMotif(tenant: string, focusId: string, actionType: 
 }
 
 export async function recomputeRicci(tenant: string): Promise<void> {
+  if (demoActive()) return;
   const response = await fetch(apiUrl(`/ricci-map?tenant=${encodeURIComponent(tenant)}`), { cache: "no-store" });
   await readJson(response);
 }
@@ -178,6 +198,7 @@ export async function streamSwarm(
   alertId: string,
   onEvent: (event: SwarmEvent) => void,
 ): Promise<void> {
+  if (demoActive()) return demoStream(tenant, onEvent);
   const response = await fetch(
     apiUrl(`/swarm/simulate?tenant=${encodeURIComponent(tenant)}&alert_id=${encodeURIComponent(alertId)}`),
     { method: "POST" },

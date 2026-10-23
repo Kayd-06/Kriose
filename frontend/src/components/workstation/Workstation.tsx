@@ -10,10 +10,9 @@ import { SchematicCanvas } from "./SchematicCanvas";
 import { SwarmRack } from "./SwarmRack";
 import { TimeRuler } from "./TimeRuler";
 import { VerdictBar } from "./VerdictBar";
-import { useWorkstation } from "./useWorkstation";
+import type { Session } from "./useWorkstation";
 
-export default function Workstation() {
-  const session = useWorkstation();
+export default function Workstation({ session }: { session: Session }) {
 
   useEffect(() => {
     let downAt = 0;
@@ -49,7 +48,7 @@ export default function Workstation() {
   }, [session]);
 
   return (
-    <div className="flex h-screen w-screen flex-col overflow-hidden bg-[#060709] text-[#E2E8F0]">
+    <div className="flex h-full w-full flex-col overflow-hidden bg-[#060709] text-[#E2E8F0]">
       <InstrumentBar session={session} />
       <VerdictBar session={session} />
       <div className="flex min-h-0 flex-1">
