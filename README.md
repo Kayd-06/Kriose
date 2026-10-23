@@ -15,6 +15,8 @@ Kriose stores everything in a [FalkorDB](https://www.falkordb.com/) graph. Four 
 
 ## Try it live (no install)
 
+**Live demo:** https://frontend-black-pi-22.vercel.app (hosted demo mode, no backend needed).
+
 The workstation has a frontend-only **demo mode** that replays a run recorded from the real backend: the seeded Acme graph plus every swarm event, paced so you can follow it. It turns on when `NEXT_PUBLIC_DEMO_MODE=1`, when you add `?demo-data=1` to the URL, or automatically when the API can't be reached (add `?live=1` to opt out). The top bar shows `DEMO · RECORDED` when it's active.
 
 Deploy your own copy on Vercel:
