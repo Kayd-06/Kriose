@@ -9,6 +9,7 @@ import { McGtsDock } from "./McGtsDock";
 import { SchematicCanvas } from "./SchematicCanvas";
 import { SwarmRack } from "./SwarmRack";
 import { TimeRuler } from "./TimeRuler";
+import { VerdictBar } from "./VerdictBar";
 import { useWorkstation } from "./useWorkstation";
 
 export default function Workstation() {
@@ -50,9 +51,10 @@ export default function Workstation() {
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-[#060709] text-[#E2E8F0]">
       <InstrumentBar session={session} />
+      <VerdictBar session={session} />
       <div className="flex min-h-0 flex-1">
         <SwarmRack session={session} />
-        <div className="relative flex min-w-0 flex-1">
+        <div className="relative flex min-w-0 flex-1 overflow-hidden">
           <SchematicCanvas session={session} />
           <CypherRepl session={session} />
         </div>

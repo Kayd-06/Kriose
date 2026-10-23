@@ -4,6 +4,7 @@
 
 html,
 body {
+  font-size: 13px;
   background: #060709;
   color: #e2e8f0;
   height: 100%;
@@ -11,6 +12,7 @@ body {
 }
 
 body {
+  font-size: 13px;
   font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
 }
 

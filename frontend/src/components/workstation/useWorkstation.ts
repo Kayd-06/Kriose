@@ -36,6 +36,19 @@ export type AgentCell = {
   state: "IDLE" | "EXECUTING" | "VERIFIED" | "VETOED";
   elapsedMs: number | null;
   tool: string;
+  summary?: string;
+};
+
+export type RunVerdict = {
+  source: "FALKOR" | "MEMORY";
+  alertId: string;
+  winner: { id: string; name: string; type: string | null; survival: number } | null;
+  skipped: { id: string; name: string; reason: string }[];
+  vetoed: { id: string; name: string; shields: string[] }[];
+  ranked: number;
+  forked: number;
+  merged: boolean;
+  finishedAt: number;
 };
 
 const TOOLS: Record<AgentId, string> = {
@@ -80,6 +93,7 @@ export function useWorkstation() {
   const [cypherOpen, setCypherOpen] = useState(false);
   const [serverNote, setServerNote] = useState<string | null>(null);
   const [memoryOnly, setMemoryOnly] = useState(false);
+  const [verdict, setVerdict] = useState<RunVerdict | null>(null);
 
   const connected = Boolean(health?.ok) && !memoryOnly;
 
@@ -243,9 +257,15 @@ export function useWorkstation() {
     setError(null);
     setAgents(idleAgents().map((cell) => ({ ...cell, state: "EXECUTING", elapsedMs: 0 })));
     try {
+      const nameOf = (id: string) => {
+        const node = graph.nodes.find((item) => item.id === id);
+        return { name: node ? node.name || node.title || id : id, type: node?.action_type ?? null };
+      };
       if (connected) {
         let winner = "none";
         let survival = "n/a";
+        const run: RunVerdict = { source: "FALKOR", alertId, winner: null, skipped: [], vetoed: [], ranked: 0, forked: 0, merged: false, finishedAt: 0 };
+        const summaries: Partial<Record<AgentId, string>> = {};
         await streamSwarm(graph.tenant, alertId, (event: SwarmEvent) => {
           const agent = mapAgent(event.agent);
           if (agent) {
@@ -263,14 +283,35 @@ export function useWorkstation() {
             );
           }
           const detail = event.detail ?? {};
+          const actionId = typeof detail.action_id === "string" ? detail.action_id : "";
+          if (event.kind === "rank" && Array.isArray(detail.actions)) run.ranked = detail.actions.length;
+          if (event.kind === "expand") run.forked += 1;
+          if (event.kind === "skip" && actionId)
+            run.skipped.push({ id: actionId, name: nameOf(actionId).name, reason: String(detail.reason ?? "known dead end") });
+          if (event.kind === "veto" && actionId)
+            run.vetoed.push({ id: actionId, name: nameOf(actionId).name, shields: Array.isArray(detail.shields) ? detail.shields.map(String) : [] });
+          if (event.kind === "merge") run.merged = true;
+          if (agent) {
+            if (agent === "SCOUT" && run.ranked) summaries.SCOUT = `ranked ${run.ranked} fixes`;
+            if (agent === "ARCHITECT") summaries.ARCHITECT = `forked ${run.forked} · skipped ${run.skipped.length}`;
+            if (agent === "NEMESIS") summaries.NEMESIS = `shocked ${run.forked} · vetoed ${run.vetoed.length}`;
+            if (agent === "ARBITER" && run.merged) summaries.ARBITER = `merged ${actionId || "winner"}`;
+            const text = summaries[agent];
+            if (text) setAgents((current) => current.map((cell) => (cell.id === agent ? { ...cell, summary: text } : cell)));
+          }
           if (event.kind === "done") {
             const summary = detail as { winner?: { action_id?: string; survival?: number } | null };
             winner = summary.winner?.action_id ?? "none";
             survival = summary.winner?.survival?.toFixed(3) ?? "0.000";
+            const id = summary.winner?.action_id;
+            run.winner = id ? { id, ...nameOf(id), survival: summary.winner?.survival ?? 0 } : null;
           }
           log(event.agent, `${event.kind}`, event.t_ms ?? 0, JSON.stringify(detail).slice(0, 700));
         });
         setServerNote(`FALKOR WINNER ${winner} survival ${survival}`);
+        // Agents that finished without a veto end VERIFIED, never stuck on EXECUTING.
+        setAgents((current) => current.map((cell) => (cell.state === "EXECUTING" ? { ...cell, state: "VERIFIED" } : cell)));
+        setVerdict({ ...run, finishedAt: Date.now() });
         await openGraph(graph.tenant);
       } else {
         const started = performance.now();
@@ -290,6 +331,17 @@ export function useWorkstation() {
           setGraph(applyMemory(graph, winner.cypher));
           log("ARBITER", `commit ${winner.action.actionId} survival ${winner.survival.toFixed(3)}`, Math.round(performance.now() - started));
         } else log("ARBITER", "no branch survived", Math.round(performance.now() - started));
+        setVerdict({
+          source: "MEMORY",
+          alertId,
+          winner: winner ? { id: winner.action.actionId, ...nameOf(winner.action.actionId), survival: winner.survival } : null,
+          skipped: localScores.filter((row) => row.pruned).map((row) => ({ id: row.actionId, name: nameOf(row.actionId).name, reason: "pruned by dark penalty / hive" })),
+          vetoed: branches.filter((branch) => !branch.action.pruned && branch.survival === 0).map((branch) => ({ id: branch.action.actionId, name: nameOf(branch.action.actionId).name, shields: [] })),
+          ranked: localScores.length,
+          forked: branches.filter((branch) => !branch.action.pruned).length,
+          merged: Boolean(winner && winner.cypher.length),
+          finishedAt: Date.now(),
+        });
         setServerNote(winner ? `MEMORY WINNER ${winner.action.actionId} survival ${winner.survival.toFixed(3)}` : "MEMORY WINNER none");
       }
     } catch (err) {
@@ -492,6 +544,16 @@ export function useWorkstation() {
     [connected, openGraph],
   );
 
+  // Demo mode: open the workstation with ?demo=1 and the swarm runs once on load.
+  const [demoDone, setDemoDone] = useState(false);
+  useEffect(() => {
+    if (demoDone || typeof window === "undefined") return;
+    if (new URLSearchParams(window.location.search).get("demo") !== "1") return;
+    if (!connected || !graph || !alertId || busy) return;
+    setDemoDone(true);
+    void execute();
+  }, [alertId, busy, connected, demoDone, execute, graph]);
+
   const branches = useMemo(() => {
     if (!graph) return [];
     return previewBranches(graph, scores, focusId, chaos);
@@ -508,6 +570,7 @@ export function useWorkstation() {
     selection,
     logs,
     agents,
+    verdict,
     busy,
     error,
     chaos,

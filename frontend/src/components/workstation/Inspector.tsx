@@ -30,7 +30,7 @@ export function Inspector({ session }: { session: Session }) {
   }, [graph, node]);
 
   return (
-    <aside className="flex w-[340px] shrink-0 flex-col border-l" style={{ background: INK.rack, borderColor: INK.line }}>
+    <aside className="flex w-[300px] shrink-0 flex-col border-l" style={{ background: INK.rack, borderColor: INK.line }}>
       <div className="border-b px-3 py-2 font-mono text-[10px] tracking-wider text-[#8B93A7]" style={{ borderColor: INK.line }}>
         INSPECTOR
       </div>

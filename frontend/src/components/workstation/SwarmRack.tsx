@@ -12,6 +12,13 @@ const STATE_COLOR = {
   VETOED: INK.crimson,
 };
 
+const ROLE = {
+  SCOUT: "ranks fixes",
+  ARCHITECT: "forks the graph",
+  NEMESIS: "stress-tests",
+  ARBITER: "merges winner",
+} as const;
+
 export function SwarmRack({ session }: { session: Session }) {
   const [open, setOpen] = useState<string | null>(null);
   const shields = useMemo(() => {
@@ -24,8 +31,8 @@ export function SwarmRack({ session }: { session: Session }) {
   }, [session.at, session.graph]);
 
   return (
-    <aside className="flex w-[400px] shrink-0 flex-col border-r" style={{ background: INK.rack, borderColor: INK.line }}>
-      <div className="grid grid-cols-4 border-b p-2" style={{ borderColor: INK.line }}>
+    <aside className="flex w-[340px] shrink-0 flex-col border-r" style={{ background: INK.rack, borderColor: INK.line }}>
+      <div className="grid grid-cols-2 gap-1 border-b p-2" style={{ borderColor: INK.line }}>
         {session.agents.map((agent, index) => (
           <div key={agent.id} className="border px-1.5 py-1" style={{ borderColor: INK.line, background: INK.module }}>
             <div className="flex items-center gap-1 font-mono text-[10px] tracking-wide">
@@ -33,9 +40,9 @@ export function SwarmRack({ session }: { session: Session }) {
               {String(index + 1).padStart(2, "0")}:{agent.id}
             </div>
             <div className="mt-1 font-mono text-[10px] tabular-nums text-[#8B93A7]">{agent.state}</div>
-            <div className="font-mono text-[10px] tabular-nums">{agent.elapsedMs === null ? "n/a" : `${agent.elapsedMs.toFixed(0)} ms`}</div>
-            <div className="truncate font-mono text-[9px] text-[#8B93A7]" title={agent.tool}>
-              {agent.tool}
+            <div className="font-mono text-[10px] tabular-nums">{agent.elapsedMs === null ? "—" : `${agent.elapsedMs.toFixed(0)} ms`}</div>
+            <div className="truncate text-[11px] text-[#AEB5C4]" title={`${ROLE[agent.id]} · tool ${agent.tool}`}>
+              {agent.summary ?? ROLE[agent.id]}
             </div>
           </div>
         ))}
