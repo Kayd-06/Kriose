@@ -144,6 +144,10 @@ class KrioseEngine:
     def __init__(self, host: str | None = None, port: int | None = None):
         self.host = host or os.getenv("FALKORDB_HOST", "localhost")
         self.port = int(port or os.getenv("FALKORDB_PORT", "6379"))
+        # Fail fast when FalkorDB is unreachable (e.g. packets silently dropped)
+        # so /api/v2/health returns ok:false instead of hanging.
+        self.connect_timeout = float(os.getenv("FALKORDB_CONNECT_TIMEOUT", "3"))
+        self.socket_timeout = float(os.getenv("FALKORDB_SOCKET_TIMEOUT", "30"))
         self._db: FalkorDB | None = None
         self.times = clock()
 
@@ -152,7 +156,12 @@ class KrioseEngine:
         # Connect lazily so the API can start (and /health can report ok:false)
         # before FalkorDB is up. A failed connect is retried on the next call.
         if self._db is None:
-            self._db = FalkorDB(host=self.host, port=self.port)
+            self._db = FalkorDB(
+                host=self.host,
+                port=self.port,
+                socket_connect_timeout=self.connect_timeout,
+                socket_timeout=self.socket_timeout,
+            )
         return self._db
 
     def ping(self) -> bool:
