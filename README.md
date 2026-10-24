@@ -13,6 +13,19 @@
 
 Kriose stores everything in a [FalkorDB](https://www.falkordb.com/) graph. Four agents (Scout, ShadowArchitect, Nemesis, Arbiter) coordinate by reading and writing edges, and each "sandbox" is a `GRAPH.COPY` of the real graph.
 
+## Try it live (no install)
+
+**Live demo:** https://frontend-black-pi-22.vercel.app (hosted demo mode, no backend needed).
+
+The workstation has a frontend-only **demo mode** that replays a run recorded from the real backend: the seeded Acme graph plus every swarm event, paced so you can follow it. It turns on when `NEXT_PUBLIC_DEMO_MODE=1`, when you add `?demo-data=1` to the URL, or automatically when the API can't be reached (add `?live=1` to opt out). The top bar shows `DEMO · RECORDED` when it's active.
+
+Deploy your own copy on Vercel:
+
+1. Import the repo on [vercel.com/new](https://vercel.com/new) and set **Root Directory** to `frontend`. `frontend/vercel.json` already sets `NEXT_PUBLIC_DEMO_MODE=1`.
+2. Or from the CLI: `cd frontend && vercel deploy`
+
+Re-record the demo data from a running stack with `scripts/record-demo.sh`.
+
 ## Prerequisites
 
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Windows/macOS), or Docker Engine with the Compose v2 plugin on Linux. Make sure it is running.
@@ -26,7 +39,7 @@ git clone https://github.com/Kayd-06/Kriose && cd Kriose
 docker compose up --build -d
 # wait ~10s for the API, then load the demo incident into FalkorDB:
 curl -X POST http://localhost:8000/api/v2/seed
-# open http://localhost:3001 and click "▶ Run the swarm on this incident"
+# open http://localhost:3001 and click "See it handle an incident →"
 ```
 
 **PowerShell (Windows)**
@@ -41,13 +54,24 @@ Shortcut: http://localhost:3001/?demo=1 runs the swarm automatically. Stop every
 
 ## What you'll see
 
-![Workstation after seeding](docs/screenshot.png)
+![Story view after a run](docs/screenshot.png)
 
-1. **Top bar** – `FALKOR` connection badge, the graph `kriose_org_acme`, node/edge counts and the lowest curvature (κ).
-2. **Incident header** – Token-Vault saturated, with the **▶ Run the swarm on this incident** button.
-3. **Graph** – services and their dependencies. Scroll to zoom, hold Space to pan, press `F` to fit. Keys `1`–`4` switch lenses (memory, curvature, Conway ghosts, hive hashes).
-4. **Swarm panel (left)** – the four agents light up in turn with a one-line summary each.
-5. **Verdict cards** – after the run: Restart *skipped (dead end)*, Throttle *vetoed by INV-SPOF*, Failover *merged, survival 1.0*.
+1. **A short intro** with a **See it handle an incident →** button (shown once; `?demo=1` skips it and runs straight away).
+2. **The alert, in plain words**: "Token-Vault-Cache is at 92% of capacity…", with who is on call.
+3. **Three fixes from the runbook as cards.** Each one goes through *Did it break things before? → Try it on a copy → Stress-test the copy*, and ends in one colour:
+   - 🟢 **Chosen**: survived every test and was applied
+   - 🟡 **Skipped**: broke things before (here: restart caused an outage, and another company hit the same failure)
+   - 🔴 **Rejected**: failed the stress test (here: throttling pushed a critical service over capacity)
+4. **The safe choice and why**, including load before → after.
+5. **Next step**: run it again to see Kriose use what it just learned, or open **Advanced view** for the system map, sandbox copies and the maths (keys `1`–`4` switch lenses, `F` fits the map).
+
+![Advanced view](docs/screenshot-advanced.png)
+
+## Try it on your own system
+
+Click **Try your own system** and paste a short YAML file. It lists your services (load and capacity), what calls what, the owners, your runbook fixes and the alert that is firing. You can also paste OTel spans. Kriose then tests your fixes the same way. You can [download a template](frontend/public/templates/kriose-system.yaml) to start from. See [docs/bring-your-own-system.md](docs/bring-your-own-system.md) for the format.
+
+![Your own system](docs/screenshot-byo.png)
 
 ## How it works
 ```mermaid
@@ -88,7 +112,7 @@ docker compose up --build
 | Workstation | http://localhost:3001 |
 | FalkorDB Browser | http://localhost:3000 |
 
-First-run seed is required; then open the workstation. It polls health every 5 seconds and loads the first tenant graph. Click **Run the swarm on this incident**, or open http://localhost:3001/?demo=1 to run it automatically. Press `F` to zoom the schematic to fit.
+First-run seed is required; then open the workstation. It polls health every 5 seconds and loads the first tenant graph. Click **See it handle an incident →** (or **Test the 3 fixes**; in Advanced view, **▶ Run the swarm on this incident**), or open http://localhost:3001/?demo=1 to run it automatically. Press `F` to zoom the schematic to fit.
 
 ```powershell
 curl.exe -X POST http://localhost:8000/api/v2/seed

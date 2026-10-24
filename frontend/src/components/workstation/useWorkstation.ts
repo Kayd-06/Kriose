@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChaosBudget, GraphData, GraphEdge, HiveMotif, LogLine, Selection, SwarmEvent, UcbRow } from "@/types/graph";
 import {
   alertsIn,
@@ -94,6 +94,10 @@ export function useWorkstation() {
   const [serverNote, setServerNote] = useState<string | null>(null);
   const [memoryOnly, setMemoryOnly] = useState(false);
   const [verdict, setVerdict] = useState<RunVerdict | null>(null);
+  // Raw events of the current/last swarm run and the graph as it was before it, for the Story view.
+  const [runEvents, setRunEvents] = useState<SwarmEvent[]>([]);
+  const [runBaseline, setRunBaseline] = useState<GraphData | null>(null);
+  const graphRef = useRef<string | null>(null);
 
   const connected = Boolean(health?.ok) && !memoryOnly;
 
@@ -162,6 +166,11 @@ export function useWorkstation() {
         const [next, motifs] = await Promise.all([loadGraph(tenant), loadHive().catch(() => [])]);
         setGraph(next);
         setHive(motifs);
+        if (next.tenant !== graphRef.current) {
+          setRunEvents([]);
+          setRunBaseline(null);
+        }
+        graphRef.current = next.tenant;
         setAt(next.incident);
         setCompare(next.baseline);
         setMemoryOnly(false);
@@ -179,7 +188,9 @@ export function useWorkstation() {
 
   useEffect(() => {
     if (!health?.ok || graph || memoryOnly) return;
-    const named = health.graphs.find((item) => item.startsWith("kriose_") && item !== "kriose_global_hive_immunology");
+    const named =
+      health.graphs.find((item) => item === "kriose_org_acme") ??
+      health.graphs.find((item) => item.startsWith("kriose_") && !item.startsWith("kriose_byo_") && item !== "kriose_global_hive_immunology");
     if (named) void openGraph(tenantOf(named));
   }, [health, graph, memoryOnly, openGraph]);
 
@@ -255,6 +266,9 @@ export function useWorkstation() {
     }
     setBusy("SWARM");
     setError(null);
+    setRunEvents([]);
+    setVerdict(null);
+    setRunBaseline(graph);
     setAgents(idleAgents().map((cell) => ({ ...cell, state: "EXECUTING", elapsedMs: 0 })));
     try {
       const nameOf = (id: string) => {
@@ -267,6 +281,7 @@ export function useWorkstation() {
         const run: RunVerdict = { source: "FALKOR", alertId, winner: null, skipped: [], vetoed: [], ranked: 0, forked: 0, merged: false, finishedAt: 0 };
         const summaries: Partial<Record<AgentId, string>> = {};
         await streamSwarm(graph.tenant, alertId, (event: SwarmEvent) => {
+          setRunEvents((current) => [...current, event]);
           const agent = mapAgent(event.agent);
           if (agent) {
             setAgents((current) =>
@@ -571,6 +586,8 @@ export function useWorkstation() {
     logs,
     agents,
     verdict,
+    runEvents,
+    runBaseline,
     busy,
     error,
     chaos,

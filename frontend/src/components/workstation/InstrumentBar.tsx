@@ -1,5 +1,6 @@
 "use client";
 
+import { demoActive } from "@/services/falkorClient";
 import { useMemo, useState } from "react";
 import { FileInput, Spline, Terminal } from "lucide-react";
 import { computeOllivierRicciCurvature, detectConwayGhostEdges, evaluateShields, filterGraph, kappaRegime, minKappa } from "@/lib/graphMathEngine";
@@ -50,7 +51,7 @@ export function InstrumentBar({ session }: { session: Session }) {
         </span>
         <span className="flex items-center gap-1.5 font-mono text-[11px] tabular-nums text-[#8B93A7]">
           <Led color={session.connected ? INK.emerald : INK.amber} />
-          {session.connected ? "FALKOR" : "MEMORY"}
+          {session.connected ? (demoActive() ? "DEMO · RECORDED" : "FALKOR") : "MEMORY"}
           <span>{session.health ? `${session.health.latencyMs.toFixed(0)} ms` : "n/a"}</span>
         </span>
         <div className="relative">
